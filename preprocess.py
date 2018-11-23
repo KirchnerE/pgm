@@ -14,16 +14,16 @@ motor7.rename_channels(lambda x: x.strip('.'))
 motor11.rename_channels(lambda x: x.strip('.'))
 
 # select for relevant channels
-selection = ["C3", "Cz", "C4", "FC1", "FC2", "CP1", "CP2", "Pz"]
+selection = ["C3", "Cz", "C4", "Fc1", "Fc2", "Cp1", "Cp2", "Pz"]
 picks = mne.pick_channels(motor3.info["ch_names"], selection)
 
 m3_events = mne.find_events(motor3)
 m7_events = mne.find_events(motor7)
 m11_events = mne.find_events(motor11)
 
-m3_epochs = mne.Epochs(motor3, m3_events, picks=picks)
-m7_epochs = mne.Epochs(motor7, m7_events, picks=picks)
-m11_epochs = mne.Epochs(motor11, m11_events, picks=picks)
+m3_epochs = mne.Epochs(motor3, m3_events, picks=picks, tmin=-0.5, tmax=0)
+m7_epochs = mne.Epochs(motor7, m7_events, picks=picks, tmin=-0.5, tmax=0)
+m11_epochs = mne.Epochs(motor11, m11_events, picks=picks, tmin=-0.5, tmax=0)
 
 m3_epochs.load_data()
 m7_epochs.load_data()
