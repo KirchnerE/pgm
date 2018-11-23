@@ -1,49 +1,45 @@
 import numpy as np
-import scipy.io as sio
+import mne
 from sklearn import svm
 
-# get eeg out of file:
-s01 = sio.loadmat("data/s01.mat")
-eeg   = s01["eeg"]
 
-srate  = eeg["srate"][0,0][0,0]
-rest_data   = eeg["rest"][0,0]
-noise_data  = eeg["noise"][0,0]
-left_data   = eeg["movement_left"][0,0]
-right_data  = eeg["movement_right"][0,0]
-events_data = eeg["movement_event"][0,0]
+epochs_train = mne.read_epochs('preprocessed_files/pp_S001R07-epo.fif')
+epochs_test = mne.read_epochs('preprocessed_files/pp_S001R07-epo.fif')
 
+def compute_X_y(epochs):
+    # Assume left is 1, right is two. Maybe this has to be swapped
+    left_events = epochs['1']
+    right_events = epochs['2']
 
-def downsample(data):
-    N = data.shape[1]
-    i = np.arange(0, N, 4)
-    return data[:, i]
+    #first dimension events, second dimension features (channels*time)
+    left_matrix = left_events.get_data()
+    num_left_events = left_matrix.shape[0]
+    left_matrix = left_matrix.reshape(num_left_events, -1)
+    right_matrix = right_events.get_data()
+    num_right_events = right_matrix.shape[0]
+    right_matrix = right_matrix.reshape(num_right_events, -1)
 
+    left_labels = np.ones((num_left_events, 1))
+    right_labels = 2 * np.ones((num_right_events, 1))
 
-event_indices = np.where(events_data[0,:] == 1)[0]
-left_vectors = []
-right_vectors = []
-for i in event_indices:
-    # get the half second before event
-    downsampled_left = downsample(left_data[:,i-int(0.5*srate):i])
-    left_vectors += [downsampled_left.reshape(-1)]
-    downsampled_right = downsample(right_data[:,i-int(0.5*srate):i])
-    right_vectors += [downsampled_right.reshape(-1)]
+    X = np.append(left_matrix, right_matrix, 0)
+    y = np.append(left_labels, right_labels, 0)
+    return X, y
 
-left_matrix = np.array(left_vectors)
-right_matrix = np.array(right_vectors)
-X = np.append(left_matrix, right_matrix, 0)
-# left movement: 0; right movement: 1
-left_labels = np.zeros(left_matrix.shape[0])
-right_labels = np.ones(right_matrix.shape[0])
-y = np.append(left_labels, right_labels, 0)
+X_train, y_train = compute_X_y(epochs_train)
+X_test, y_test = compute_X_y(epochs_test)
 
 # create support vector machine:
-clf = svm.SVC(gamma=0.05) # TODO: find good gamma on validation set
-clf.fit(X, y)
+clf = svm.SVC(gamma=0.005) # TODO: find good gamma on validation set
+clf.fit(X_train, y_train)
 
 # Test on training data -> TODO: more data with train and validation set
-pred_l = clf.predict(left_matrix[0,:].reshape(1,-1))
-pred_r = clf.predict(right_matrix[0,:].reshape(1,-1))
-print(pred_l)
-print(pred_r)
+pred = clf.predict(X_test)
+
+num_test_events = y_test.shape[0]
+
+print("\n\n")
+print(pred)
+print(y_test.T)
+correctly_classified = 1 - np.abs(pred-y_test.T).sum()/num_test_events
+print(correctly_classified, "% of the samples were correctly classified")
